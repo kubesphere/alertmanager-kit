@@ -48,6 +48,10 @@ func NewClient(config ClientConfig) (*AlertmanagerClient, error) {
 				return nil, fmt.Errorf("error converting port：%v", e)
 			}
 		}
+		// Additional targetPort can be configured when using url configuration.
+		if config.Service != nil {
+			c.config.targetPort = config.Service.TargetPort
+		}
 	} else if svc := config.Service; svc != nil {
 		c.config.host = fmt.Sprintf("%s.%s.svc", svc.Name, svc.Namespace)
 		c.config.port = svc.Port
@@ -146,7 +150,6 @@ func (c *AlertmanagerClient) GetSilences(ctx context.Context, filter []string) (
 	return ss, nil
 }
 
-
 func (c *AlertmanagerClient) PostSilence(ctx context.Context, rsil *RawSilence) (string, error) {
 	p := toPostSilenceParams(ctx, rsil)
 	ps, e := c.balancer.Silence.PostSilences(p)
@@ -195,7 +198,7 @@ func (c *AlertmanagerClient) peerHosts(s *AlertmanagerStatus) []string {
 	}
 	var phosts []string
 	for _, ps := range s.Cluster.Peers {
-		if phost := strings.SplitN(*ps.Name, ":", 1)[0]; phost != "" {
+		if phost := strings.Split(*ps.Address, ":")[0]; phost != "" {
 			phosts = append(phosts, phost)
 		}
 	}
@@ -205,7 +208,7 @@ func (c *AlertmanagerClient) peerHosts(s *AlertmanagerStatus) []string {
 func (c *AlertmanagerClient) getBackends(peerHosts []string) ([]*client.Alertmanager, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	var phmap map[string]struct{}
+	phmap := make(map[string]struct{})
 	for _, ph := range peerHosts {
 		u := fmt.Sprintf("%s://%s:%d", c.config.scheme, ph, *c.config.targetPort)
 		phmap[u] = struct{}{}
@@ -297,7 +300,7 @@ func toGetAlertGroupsParams(ctx context.Context, af *AlertsFilter) *alertgroup.G
 		WithReceiver(&af.Receiver)
 }
 
-func  toPostAlertsParams(ctx context.Context, alerts []*RawAlert) *alert.PostAlertsParams {
+func toPostAlertsParams(ctx context.Context, alerts []*RawAlert) *alert.PostAlertsParams {
 	var as models.PostableAlerts
 	for _, a := range alerts {
 		as = append(as, &models.PostableAlert{
