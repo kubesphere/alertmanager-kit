@@ -222,7 +222,7 @@ func (c *AlertmanagerClient) getBackends(peerHosts []string) ([]*client.Alertman
 	}
 	for u, _ := range c.backends {
 		if _, ok := phmap[u]; !ok {
-			delete(phmap, u)
+			delete(c.backends, u)
 		}
 	}
 
