@@ -17,6 +17,7 @@ import (
 	"github.com/prometheus/alertmanager/api/v2/client/silence"
 	"github.com/prometheus/alertmanager/api/v2/models"
 	"github.com/prometheus/alertmanager/cli"
+	"github.com/prometheus/alertmanager/types"
 )
 
 type AlertmanagerClient struct {
@@ -114,10 +115,14 @@ func (c *AlertmanagerClient) PostAlerts(ctx context.Context, alerts []*RawAlert)
 		}
 		ams = append(ams, bks...)
 	}
+	var errs types.MultiError
 	for _, am := range ams {
 		if _, e := am.Alert.PostAlerts(p); e != nil {
-			return e
+			errs.Add(e)
 		}
+	}
+	if errs.Len() > 0 {
+		return &errs
 	}
 	return nil
 }
